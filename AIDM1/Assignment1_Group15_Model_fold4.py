@@ -181,7 +181,7 @@ def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0
 
 df = df_ratings.sample(n=800000, random_state=12)
 #get_ipython().run_line_magic('time', 'm,r = generate_model(df,max_iter=15,eta=eta,lam=lam)')
-#print(r)
+##print(r)
 
 
 # The `get_best_model` function retrieves the model with the lowest rmse for various combinations of `eta` (learning rate) and `lam` (regularization factor).
@@ -329,14 +329,13 @@ def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
 
 # In[ ]:
 
-
 print('start')
-kf = KFold(n_splits=5, shuffle=True, random_state=25072019)
+kf = KFold(n_splits=5, shuffle=True, random_state=28072019)
 for train_index, test_index in kf.split(df_ratings):
     df_train, df_test = df_ratings.iloc[train_index], df_ratings.iloc[test_index]
 
 m_fold,r_fold = generate_model(df_train)
-np.savez('datasets/m_fold-r_fold_1', m_fold, r_fold)
+np.savez('datasets/m_fold-r_fold_4', m_fold, r_fold)
 
 
 # In[ ]:

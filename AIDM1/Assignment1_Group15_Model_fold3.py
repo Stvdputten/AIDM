@@ -329,14 +329,13 @@ def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
 
 # In[ ]:
 
-
 print('start')
-kf = KFold(n_splits=5, shuffle=True, random_state=25072019)
+kf = KFold(n_splits=5, shuffle=True, random_state=27072019)
 for train_index, test_index in kf.split(df_ratings):
     df_train, df_test = df_ratings.iloc[train_index], df_ratings.iloc[test_index]
 
 m_fold,r_fold = generate_model(df_train)
-np.savez('datasets/m_fold-r_fold_1', m_fold, r_fold)
+np.savez('datasets/m_fold-r_fold_3', m_fold, r_fold)
 
 
 # In[ ]:
