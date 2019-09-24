@@ -111,7 +111,7 @@ lam = file['arr_1']
 # In[11]:
 
 
-def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0.78212853,beta=0.87673970,gamma=-2.35619748):
+def generate_model(df,eta=0.001,lam=0.01,max_iter=15,K=40,seed=22070219,alpha=0.78212853,beta=0.87673970,gamma=-2.35619748):
     # initialize parameters
     matrix = np.nan_to_num(pd.crosstab(df.UserId,df.MovieId,values=df.Rating,aggfunc='mean').to_numpy())
     u = df['UserId'].nunique()
@@ -334,8 +334,9 @@ kf = KFold(n_splits=5, shuffle=True, random_state=27072019)
 for train_index, test_index in kf.split(df_ratings):
     df_train, df_test = df_ratings.iloc[train_index], df_ratings.iloc[test_index]
 
+print('start')
 m_fold,r_fold = generate_model(df_train)
-np.savez('datasets/m_fold-r_fold_3', m_fold, r_fold)
+np.savez('datasets/m_fold-r_fold_3', m_fold, r_fold, eta=eta, lam=lam)
 
 
 # In[ ]:
