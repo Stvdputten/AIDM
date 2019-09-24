@@ -300,7 +300,7 @@ def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
         start = timeit.default_timer()
         df_train, df_test = df.iloc[train_index].copy(), df.iloc[test_index].copy()
     
-        m = generate_model(df,max_iter=10,eta=eta,lam=lam)
+        m,rmse = generate_model(df,max_iter=10,eta=eta,lam=lam)
         # run function on training set
         df_train.loc[:,'RatingTrained'] = [rating_model(model=m,df=df_train,user=u,item=i)                                            for u, i in zip(df_train['UserId'],df_train['MovieId'])]
 #         print(i,'trained')
