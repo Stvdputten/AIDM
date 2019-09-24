@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 import os.path
 import sklearn
 from sklearn.model_selection import KFold
+import timeit
 
 
 # ### **Data Extraction and Preparation**
@@ -75,12 +76,15 @@ def prep_data(path='datasets/ratings'):
     return df_ratings
 
 
-# The following snippet is responsible for running the extraction and preparation of the raw data. The data is stored in `df_ratings`.
+# The following snippet is responsible for running the extraction and preparation of the raw data. The data is stored in `df_ratings`. `eta` and `lam` were precomputed and saved and now reloaded to begin.
 
-# In[5]:
+# In[10]:
 
 
 df_ratings = prep_data()
+file = np.load('datasets/eta-lam.npz')
+eta = file['arr_0']
+lam = file['arr_1']
 
 
 # ### **Rating Model**
@@ -91,9 +95,10 @@ df_ratings = prep_data()
 # 
 # In order to do this the function uses the following parameters:
 #   * `df` - the dataframe containing the dataset on which the model will be computed
-#   * `eta` - the learning rate
-#   * `lam` - the regularization factor
+#   * `eta` - the learning rate (estimated using get_best_model with 8000000 samples)
+#   * `lam` - the regularization factor (estimated using get_best_model with 8000000 samples)
 #   * `max_iter` - the maximum number of iterations allowed in attempting to find a local minimum
+#   * `K` - The laten features (set to 40 randomly chosen)
 #   * `seed` - the random seed to use for generating the initial weights
 #   * `alpha` - [for unrated combos] the weight for the average user rating
 #   * `beta` -  [for unrated combos] the weight for the average user rating
@@ -101,15 +106,9 @@ df_ratings = prep_data()
 #     
 # Additionally it returns the following values:
 #   * `model` - a vector containing the predicted rating for each movie
-#   * `rmse` - the root-mean-square-error for this model
+#   * `curr_rmse` - the root-mean-square-error for this model
 
-# In[142]:
-
-
-import timeit
-
-
-# In[281]:
+# In[11]:
 
 
 def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0.78212853,beta=0.87673970,gamma=-2.35619748):
@@ -145,7 +144,9 @@ def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0
         n += 1
     model = np.dot(user,item)
     
-    # replace random weights of the non-rated user/movie combos with equally weighted average rating for that movie and that user
+    # Replace random weights of the non-rated user/movie combos with equally 
+    # weighted average rating for that movie and that user
+    # Also made use of some interesting vector calculations to remove for loop and increase efficiency
     np.where(matrix==0,np.nan,matrix)
     user_mean = np.nanmean(model,axis=1)
     item_mean = np.nanmean(model,axis=0)
@@ -175,15 +176,15 @@ def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0
     return model, curr_rmse
 
 
-# In[288]:
+# In[12]:
 
 
-#df = df_ratings.sample(n=800000, random_state=12)
-#get_ipython().run_line_magic('time', 'm,r = generate_model(df,max_iter=15,eta=eta,lam=lam)')
-#print(r)
+df = df_ratings.sample(n=800000, random_state=12)
+get_ipython().run_line_magic('time', 'm,r = generate_model(df,max_iter=15,eta=eta,lam=lam)')
+print(r)
 
 
-# The `get_best_model` function retreives the model with the lowest rmse for various combinations of `eta` (learning rate) and `lam` (regularization factor).
+# The `get_best_model` function retrieves the model with the lowest rmse for various combinations of `eta` (learning rate) and `lam` (regularization factor).
 # 
 # In order to do this the function uses the following parameters:
 #   * `df` - the dataframe containing the dataset on which the model will be computed
@@ -191,10 +192,10 @@ def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0
 #   * `progression_ratio` - the ratio to be used when generating the geometric progression
 #   
 # Additionally it returns the following values:
-#   * `model` - a vector containing the best predicted ratings for each user/model.
-#   * `rmse` - the root-mean-square-error for the best model
-#   * `eta` - the learning rate of the best model
-#   * `lam` - the regularization factor of the best model
+#   * `best_model` - a vector containing the best predicted ratings for each user/model.
+#   * `best_rmse` - the root-mean-square-error for the best model
+#   * `best_eta` - the learning rate of the best model
+#   * `best_lam` - the regularization factor of the best model
 
 # In[284]:
 
@@ -204,7 +205,7 @@ def get_best_model(df,max_progression = 4,progression_ratio=3):
     
     max_iter=15
     
-    #geometric progression chosen
+    #geometric progression chosen for eta and lam
     eta_progression = [0.001 * progression_ratio**i for i in range(max_progression)]
     lam_progression = [0.01 * progression_ratio**i for i in range(max_progression)]
     best_model = []
@@ -231,14 +232,11 @@ def get_best_model(df,max_progression = 4,progression_ratio=3):
 # In[285]:
 
 
-#X = df_ratings #.iloc[:200]
-#get_ipython().run_line_magic('time', 'model, rmse, eta, lam = get_best_model(X)#\\')
+X = df_ratings #.iloc[:200]
+get_ipython().run_line_magic('time', 'model, rmse, eta, lam = get_best_model(X)#\\')
 #model, rmse, eta, lam = get_best_model(df_ratings)
 # np.savez('datasets/model-rmse-eta-lam', model, rmse, eta, lam)
-file = np.load('datasets/eta-lam.npz')
-eta = np.float64(file['arr_0'])
-lam = np.float64(file['arr_1'])
-#print('The best model has rmse of '+str(rmse)+' and eta of '+str(eta)+' and lam of '+str(lam))
+print('The best model has rmse of '+str(rmse)+' and eta of '+str(eta)+' and lam of '+str(lam))
 
 
 # The `rating_model` function predicts the user's ratings for a certain movie by implenting Matrix factorization with Gradient Descent. 
@@ -252,7 +250,7 @@ lam = np.float64(file['arr_1'])
 # Additionally it returns the following value:
 #   * `rating` - the predicted rating for the requested movie by the requested user
 
-# In[9]:
+# In[292]:
 
 
 def rating_model(model,df,user,item):
@@ -266,8 +264,11 @@ def rating_model(model,df,user,item):
 
 # The following snippet executes a test run of the rating function.
 
-# In[10]:
+# In[325]:
 
+
+example = rating_model(m,df_ratings,1,1)
+print(example)
 
 
 # ### **Cross-validation**
@@ -281,12 +282,14 @@ def rating_model(model,df,user,item):
 #   * `df` - the dataframe containing the original dataset
 #   * `n` - the number of folds to be generated
 #   * `seed` - the random seed to be used
+#   * `eta` - the learning rate 
+#   * `lam` - the regularization factor
 #     
 # Additionally it returns the following value:
 #   * `train_error` - the average error for this function on the training set
 #   * `test_error` - the average error for this function on the test set
 
-# In[290]:
+# In[328]:
 
 
 def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
@@ -300,9 +303,9 @@ def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
         start = timeit.default_timer()
         df_train, df_test = df.iloc[train_index].copy(), df.iloc[test_index].copy()
     
-        m,rmse = generate_model(df,max_iter=10,eta=eta,lam=lam)
+        m, r = generate_model(df,max_iter=10,eta=eta,lam=lam)
         # run function on training set
-        df_train.loc[:,'RatingTrained'] = [rating_model(model=m,df=df_train,user=u,item=i)                                            for u, i in zip(df_train['UserId'],df_train['MovieId'])]
+        df_train.loc[:,'RatingTrained'] = [rating_model(model=m,df=df_train,user=u,item=i) for u, i in zip(df_train['UserId'],df_train['MovieId'])]
 #         print(i,'trained')
         # compute error on train set
         df_train.loc[:,'DiffSquared'] = [(t - r)**2 for t, r in zip(df_train['RatingTrained'],df_train['Rating'])]
@@ -327,11 +330,28 @@ def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
 # In[ ]:
 
 
-train, test = run_validation(df_ratings,eta,lam)
+kf = KFold(n_splits=5, shuffle=True, random_state=24072019)
+for train_index, test_index in kf.split(df_ratings):
+    df_train, df_test = df_ratings.iloc[train_index], df_ratings.iloc[test_index]
+
+m_fold,r_fold = generate_model(df_train)
+np.savez('datasets/m_fold-r_fold', m_fold, r_fold)
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+#train, test = run_validation(df_ratings,eta,lam)
 #train, test = run_validation(model,df_ratings)
-np.savez('datasets/train_test_model', train, test)
-print("Mean training error: " + str(train))
-print("Mean test error: " + str(test))
+#np.savez('datasets/train_test_model', train, test)
+#print("Mean training error: " + str(train))
+#print("Mean test error: " + str(test))
 
 
 # ### **Cross-validation Results**
@@ -339,8 +359,8 @@ print("Mean test error: " + str(test))
 # As can be seen by running the `run_validation` function for the various rating function the performance for each function vastly differs. This is obvious as each function takes a more detailed look (i.e. considers more factors) into what could influence the rating. TODO TODO TODO TODO
 # 
 # Below is an ordered list ranking the different functions from most accurate (lowest mean test error) to least accurate:
-#   1. `rating_model` - test error of XX and training error of YY
-#   2. `rating_user_item` - test error of XX and training error of YY
-#   3. `rating_TODO` - test error of XX and training error of YY 
-#   4. `rating_TODO` - test error of XX and training error of YY
+#   1. `rating_user_item` - test error of 0.900 and training error of 0.914
+#   2. `rating_item` - test error of 0.967 and training error of 0.974 
+#   3. `user_user` - test error of 1.016 and training error of 1.027
+#   4. `rating_global` - test error of 1.117 and training error of 1.117
 #   5. `rating_global` - test error of XX and training error of YY
