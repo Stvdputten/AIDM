@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# 
+# 
 # ## **Advances in Data Mining**
 # 
 # Stephan van der Putten | (s1528459) | stvdputtenjur@gmail.com  
@@ -101,71 +103,90 @@ df_ratings = prep_data()
 #   * `model` - a vector containing the predicted rating for each movie
 #   * `rmse` - the root-mean-square-error for this model
 
-# In[6]:
+# In[142]:
 
 
-def generate_model(df,eta=0.001,lam=0.01,max_iter=1000,seed=22070219,alpha=0.78212853,beta=0.87673970,gamma=-2.35619748):
+import timeit
+
+
+# In[281]:
+
+
+def generate_model(df,eta=0.001,lam=0.01,max_iter=100,K=40,seed=22070219,alpha=0.78212853,beta=0.87673970,gamma=-2.35619748):
     # initialize parameters
     matrix = np.nan_to_num(pd.crosstab(df.UserId,df.MovieId,values=df.Rating,aggfunc='mean').to_numpy())
     u = df['UserId'].nunique()
     i = df['MovieId'].nunique()
     np.random.seed = seed
-    user = np.random.rand(u,1)
-    item = np.random.rand(1,i)
-    error = np.full((u, i), np.nan)
+    user = np.random.rand(u,K)
+    item = np.random.rand(K,i)
+    inds = np.nonzero(matrix)
     prev_rmse = np.inf
     rmse = np.inf
     curr_rmse = 0
-    n = 0
+    n = 1
     
     # iterate over all records
     while prev_rmse != curr_rmse:
-        it = np.nditer(matrix, flags=['multi_index'],op_flags=['readwrite'])
-        while not it.finished:
-            rating = it[0]
-            if rating is np.nan:
-                it.iternext() # skip if no known rating
-
-            a,b = it.multi_index
-            u_user = user[a][0]
-            i_item = item[0][b]
-
-            err = rating - (u_user * i_item)
-            u_user = u_user + eta * ((err * i_item) - (lam * u_user))
-            i_item = i_item + eta * ((err * u_user) - (lam * i_item))
-
-            user[a][0] = u_user
-            item[0][b] = i_item
-            error[a][b] = err
-            it.iternext()
+        for u,i in zip(inds[0], inds[1]):
+            prediction = np.dot(user[u,:], item[:, i])
+            err = matrix[u][i] - prediction
+            user[u,:] = np.add(user[u,:],np.multiply(eta,np.subtract(                            np.multiply(2,np.multiply(err,item[:,i])),                            np.multiply(lam,user[u,:]))))
+            item[:,i] = np.add(item[:,i],np.multiply(eta,np.subtract(                            np.multiply(2,np.multiply(err,user[u,:])),                            np.multiply(lam,item[:,i]))))
+        predictions = np.dot(user,item)
+        weights = matrix.copy()
+        weights[weights > 0] = 1
+        mse = sklearn.metrics.mean_squared_error(np.nan_to_num(predictions).flatten(),                                                 np.nan_to_num(matrix).flatten(),                                                 sample_weight=np.nan_to_num(weights).flatten())
         prev_rmse = rmse
         rmse = curr_rmse 
-        curr_rmse = np.sqrt(np.nanmean(np.square(error)))
+        curr_rmse = np.sqrt(mse)
         if n == max_iter:
             break
         n += 1
-
     model = np.dot(user,item)
     
     # replace random weights of the non-rated user/movie combos with equally weighted average rating for that movie and that user
-    item_mean = np.nanmean(model,axis=0)
+    np.where(matrix==0,np.nan,matrix)
     user_mean = np.nanmean(model,axis=1)
-    inds = np.where(np.isnan(np.where(matrix==0,np.nan,matrix)))
-    model[inds] = (alpha*np.take(user_mean,inds[0]) + beta*np.take(item_mean,inds[1]) + gamma)
-    
+    item_mean = np.nanmean(model,axis=0)
+    i = len(item_mean)
+    u = len(user_mean)
+    user_mean = np.expand_dims(user_mean,axis=0).T
+    user_mean = np.repeat(a=user_mean, repeats=i,axis=1)
+    user_mean = user_mean * alpha
+    item_mean = np.expand_dims(item_mean,axis=0)
+    item_mean = np.repeat(a=item_mean, repeats=u,axis=0)
+    item_mean = item_mean * beta
+    weighted_result = user_mean + item_mean + gamma
+    model_weights = matrix.copy()
+    model_weights = np.nan_to_num(model_weights)
+    model_weights[model_weights > 0] = 1
+    algo_weights = model_weights.copy()
+    algo_weights[algo_weights > 0] = -1
+    algo_weights[algo_weights == 0] = 1
+    algo_weights[algo_weights < 0] = 0
+    algo_result = np.multiply(algo_weights,weighted_result)
+    model_result = np.multiply(model_weights,model)
+    model = algo_result + model_result
+
     # ensure ratings are between 1 and 5
     model[model < 1] = 1
     model[model > 5] = 5
-    
-    return model, rmse
+    return model, curr_rmse
+
+
+# In[288]:
+
+
+#df = df_ratings.sample(n=800000, random_state=12)
+#get_ipython().run_line_magic('time', 'm,r = generate_model(df,max_iter=15,eta=eta,lam=lam)')
+#print(r)
 
 
 # The `get_best_model` function retreives the model with the lowest rmse for various combinations of `eta` (learning rate) and `lam` (regularization factor).
 # 
 # In order to do this the function uses the following parameters:
 #   * `df` - the dataframe containing the dataset on which the model will be computed
-# 
-#   * `max_iter` - the maximum number of iterations allowed in attempting to find a local minimum
 #   * `max_progression` - the number of different `eta` and `lam` values to be tested (e.g. lenght of the geometric progression)
 #   * `progression_ratio` - the ratio to be used when generating the geometric progression
 #   
@@ -175,11 +196,15 @@ def generate_model(df,eta=0.001,lam=0.01,max_iter=1000,seed=22070219,alpha=0.782
 #   * `eta` - the learning rate of the best model
 #   * `lam` - the regularization factor of the best model
 
-# In[7]:
+# In[284]:
 
 
 def get_best_model(df,max_progression = 4,progression_ratio=3):
-    max_iter=1000
+    df = df.sample(n=200000, random_state=1)
+    
+    max_iter=15
+    
+    #geometric progression chosen
     eta_progression = [0.001 * progression_ratio**i for i in range(max_progression)]
     lam_progression = [0.01 * progression_ratio**i for i in range(max_progression)]
     best_model = []
@@ -187,38 +212,33 @@ def get_best_model(df,max_progression = 4,progression_ratio=3):
     best_eta = 0
     best_lam = 0
     for i in range(max_progression):
-        model, rmse = generate_model(df,eta=eta_progression[i],lam=lam_progression[i],max_iter=max_iter)
+        model, rmse = generate_model(df,eta=eta_progression[i],lam=lam_progression[0],max_iter=max_iter)
         if rmse < best_rmse:
             best_model = model
             best_rmse = rmse
             best_eta = eta_progression[i]
+    for i in range(max_progression):
+        model, rmse = generate_model(df,eta=eta_progression[0],lam=lam_progression[i],max_iter=max_iter)
+        if rmse < best_rmse:
+            best_model = model
+            best_rmse = rmse
             best_lam = lam_progression[i]
-        if i != (max_progression - 1):
-            model, rmse = generate_model(df,eta=eta_progression[i+1],lam=lam_progression[i],max_iter=max_iter)
-            if rmse < best_rmse:
-                best_model = model
-                best_rmse = rmse
-                best_eta = eta_progression[i+1]
-                best_lam = lam_progression[i]
-            model, rmse = generate_model(df,eta=eta_progression[i],lam=lam_progression[i+1],max_iter=max_iter)
-            if rmse < best_rmse:
-                best_model = model
-                best_rmse = rmse
-                best_eta = eta_progression[i]
-                best_lam = lam_progression[i+1]
     return best_model, best_rmse, best_eta, best_lam
 
 
 # The following snippet retrieves the best model:
 
-# In[8]:
+# In[285]:
 
 
-X = df_ratings #.iloc[:200]
-model, rmse, eta, lam = get_best_model(X)#\
+#X = df_ratings #.iloc[:200]
+#get_ipython().run_line_magic('time', 'model, rmse, eta, lam = get_best_model(X)#\\')
 #model, rmse, eta, lam = get_best_model(df_ratings)
-np.savez('datasets/model-rmse-eta-lam', model, rmse, eta, lam)
-print('The best model has rmse of '+str(rmse)+' and eta of '+str(eta)+' and lam of '+str(lam))
+# np.savez('datasets/model-rmse-eta-lam', model, rmse, eta, lam)
+file = np.load('datasets/eta-lam.npz')
+eta = np.float64(file['arr_0'])
+lam = np.float64(file['arr_1'])
+#print('The best model has rmse of '+str(rmse)+' and eta of '+str(eta)+' and lam of '+str(lam))
 
 
 # The `rating_model` function predicts the user's ratings for a certain movie by implenting Matrix factorization with Gradient Descent. 
@@ -249,9 +269,6 @@ def rating_model(model,df,user,item):
 # In[10]:
 
 
-a = rating_model(model,X,1,1193)
-print(a)
-
 
 # ### **Cross-validation**
 # 
@@ -269,21 +286,23 @@ print(a)
 #   * `train_error` - the average error for this function on the training set
 #   * `test_error` - the average error for this function on the test set
 
-# In[11]:
+# In[290]:
 
 
-def run_validation(m,df,n=5,seed=17092019):
+def run_validation(df, eta=0.001,lam=0.01, n=5,seed=17092019):
     err_train = np.zeros(n)
     err_test = np.zeros(n)
-    print(df)
     kf = KFold(n_splits=n, shuffle=True,random_state=seed)
-
+    
+   
     i = 0
     for train_index, test_index in kf.split(df):
+        start = timeit.default_timer()
         df_train, df_test = df.iloc[train_index].copy(), df.iloc[test_index].copy()
-        
+    
+        m = generate_model(df,max_iter=10,eta=eta,lam=lam)
         # run function on training set
-        df_train.loc[:,'RatingTrained'] = [rating_model(model=m,df=df_train,user=u,item=i) for u, i in zip(df_train['UserId'],df_train['MovieId'])]
+        df_train.loc[:,'RatingTrained'] = [rating_model(model=m,df=df_train,user=u,item=i)                                            for u, i in zip(df_train['UserId'],df_train['MovieId'])]
 #         print(i,'trained')
         # compute error on train set
         df_train.loc[:,'DiffSquared'] = [(t - r)**2 for t, r in zip(df_train['RatingTrained'],df_train['Rating'])]
@@ -294,6 +313,9 @@ def run_validation(m,df,n=5,seed=17092019):
         err_test[i] = np.sqrt(np.mean(df_test['DiffSquared']))  
 #         print(i,'test trained and error')
         i = i + 1
+        print(i)
+        stop = timeit.default_timer()
+        print('Time kfold = ', (stop-start))
     # compute total error
     train_error = np.mean(err_train)
     test_error = np.mean(err_test)
@@ -302,10 +324,10 @@ def run_validation(m,df,n=5,seed=17092019):
 
 # The following snippet computes the mean train and test errors for the `rating_model`
 
-# In[14]:
+# In[ ]:
 
 
-train, test = run_validation(model,X)
+train, test = run_validation(df_ratings,eta,lam)
 #train, test = run_validation(model,df_ratings)
 np.savez('datasets/train_test_model', train, test)
 print("Mean training error: " + str(train))
