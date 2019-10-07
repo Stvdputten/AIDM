@@ -19,15 +19,15 @@
 
 # The following snippet handles all imports.
 
-# In[1]:
+# In[2]:
 
 
+import time
 import sys
 import numpy as np
-from scipy.sparse import csr_matrix
-from joblib import Parallel, delayed
-import multiprocessing
-import timeit
+import pandas as pd
+from scipy.sparse import csr_matrix, csc_matrix, coo_matrix, lil_matrix, find
+from scipy.sparse import identity
 
 
 # ### **Program Execution**
@@ -43,51 +43,125 @@ import timeit
 #   * `seed` - the value to use as random seed
 #   * `path` - the location of the `user_movies.npy` file
 
-# In[ ]:
+# In[3]:
 
 
-# user_movie = np.load('datasets/user_movie.npy')
-# user_movie = user_movie[:1000,]
-
-
-# In[6]:
-
-
-# %%time
 user_movie = np.load('datasets/user_movie.npy')
-c = user_movie[:,0]
-r = user_movie[:,1]
-d = np.ones(len(c))
-max_c = len(np.unique(c))
-max_r = len(np.unique(r))
-m = csr_matrix((d, (r,c)), shape=(max_r, max_c))
-signature_length = 10
-hash_func = [np.random.permutation(max_r) for i in range(signature_length)]
-matrix = np.full((signature_length, max_c), np.inf)
+
+
+# In[4]:
+
+
+get_ipython().run_cell_magic('time', '', 'c = user_movie[:,0]\nr = user_movie[:,1]\nd = np.ones(len(c))\nmax_c = len(np.unique(c))\nmax_r = len(np.unique(r))\n# m = csr_matrix((d, (r,c)), shape=(max_r, max_c))\ncsc = csc_matrix((d, (r,c)), shape=(max_r, max_c))\ncsr = csr_matrix((d, (r,c)), shape=(max_r, max_c))\nsignature_length = 50\n\n# example = np.array([[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,0,1,0],[0,0,1,0]])\n# hash_func = np.array([[4,3,1,2,0], [3,0,4,2,1]])')
+
+
+# In[47]:
+
+
+def rowminhash(signature_length, hashfunc, matrix):
+    sigm = np.full((signature_length, matrix.shape[1]), np.inf)
+    for row in range(matrix.shape[0]):
+        ones = find(matrix[row, :])[1]
+        hash = hash_func[:,row]
+        B = sigm.copy()
+        B[:,ones] = 1
+        B[:,ones] = np.multiply(B[:,ones], hash.reshape((len(hash), 1)))
+        # B[:, ones] *= hash.reshape((len(hash),1))
+        sigm = np.minimum(sigm, B)
+        # print(example[row%len(hash_func), ones] * hash.reshape((len(hash),1)))
+        # np.amin()
+        # sigm[example]
+        # sigm[]
+        
+        # print(example[row%len(hash_func), ones]*hash.reshape((len(hash),1)))
+        # np.dot(example[row%len(hash_func)],hash)
+        # row_sign = np.amin(hash, axis=0)
+        # print(np.multiply(np.array([[1,1],[1,1]]), np.array([[2],[3]])))
+        # print('Rowsgn = ', row_sign)
+        # sigm[row%len(hash_func), ones] = hash
+        # print('Row =', row, 'Ones =' ,ones, 'Hash =', hash)
+        # print(sigm[row%len(hash_func), ones])
+        # for row,col in zip(*example.nonzero()):
+        # hash = hash_func[:, row]
+        # print('Row =', row, 'Ones =' ,ones, 'Hash =', hash)
+        # print(row,col)
+    return(sigm)
+
+
+# In[19]:
+
+
+def minhash(signature_length,hashfunc, matrix):
+    # t0 = time.time()
+    sigm = np.full((signature_length, matrix.shape[1]), np.inf)
+    # print(sigm)
+    # hash_func = np.array([np.random.permutation(matrix.shape[0]) for i in range(signature_length)])
+    # print(hash_func)
+    for r,c in zip(*matrix.nonzero()):
+        # print('r = ', r, 'c = ', c)
+        for h_i in range(signature_length):
+            # print('h_i = ' ,h_i)
+            hash = hash_func[h_i]
+            if(hash[r] < sigm[h_i][c]):
+                # print(hash[r])
+                sigm[h_i][c] = hash[r]
+            # print("\nGenerating MinHash signatures took %.2fsec" % elapsed)
+        # elapsed = (time.time() - t0)            
+    return(sigm)  
 
 
 # In[ ]:
 
 
-# what are your inputs, and what operation do you want to 
-# perform on each input. For example...
-def processInput(i,j):
-    # print(i,j)
-    for h_i in range(signature_length):
-        hash = hash_func[h_i]
-        # print(hash[i], (i,j), matrix[h_i][j])
-        if(hash[i] < matrix[h_i][j]):
-            matrix[h_i][j] = hash[i]
-        # print(hash)
-        
-        # print(hash[i], (i,j), matrix[h_i][j])
-        # if(timeit.default_timer()-start > 30):
-        #     print('STOP')
-        #     break
-            
-    np.save('datasets/sign_matrix', matrix)
+def do_lsh(sign_matrix, signature_length, threshold):
+    return 0
 
-            
+
+# In[48]:
+
+
+np.random.seed = 42
+
+# example = csr
+# example = np.array([[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,0,1,0],[0,0,1,0]])
+hash_func = np.array([np.random.permutation(csr.shape[0]) for i in range(signature_length)])
+# %time sigm1 = minhash(signature_length,hash_func, example)
+get_ipython().run_line_magic('time', 'sigm1 = rowminhash(100 ,hash_func, csr)')
+get_ipython().run_line_magic('time', 'sigm2 = rowminhash(signature_length,hash_func, csr)')
+# print(sigm2)
+np.save('datasets/sign_matrix_100', sigm1)
+np.save('datasets/sign_matrix', sigm2)
+
+# print(np.equal(sigm1, sigm2))
+
+
+# In[ ]:
+
+
+print(hash_func)
+# csr1 = example
+for row in range(csr1.shape[1]):
+    ones = find(csr1[row,:])[1]
+    # print(ones)
+    hash = hash_func[:, ones]
+    print(hash)
+    # np.amin()
+    
+    # row_signature = np.amin(hash,).reshape((1,signature_length))
+# 
+# for row in range(test[:,:2].shape[1]):
+#     ones_index = np.where(test[row,:]==1)
+# for row in range(n_row):
+#     ones_index = np.where(u[row,:]==1)[0]
+#     corresponding_hashes = hash_code[:,ones_index]
+# 
+#     row_signature = np.amin(corresponding_hashes,axis=1).reshape((1,num_of_hashes))
+#     
+#     signature_array[row,:] = row_signature
+#     
+#     if row % 10000 == 0 :
+#       #print(row)
+#       print (str(round(row*100/n_row,2))+' percent complete in '+str(round(time.time()-t2,2))+' seconds')
 
 
 # In[ ]:
@@ -97,16 +171,6 @@ def main(argv):
     seed = sys.argv[1]
     path = sys.argv[2]
     print(seed, path)
-    
-    num_cores = 8
-    print(num_cores)
-    
-    start = timeit.default_timer()
-    Parallel(n_jobs=num_cores, max_nbytes='50M')(delayed(processInput)(i,j) for i,j in zip(*m.nonzero()))
-    end = timeit.default_timer() - start
-    
-    print('Done in: ', end, 'seconds!')
-    
 
 
 # The following snippet passes the start of the program and the command line arguments to the `main` function.
