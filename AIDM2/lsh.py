@@ -52,10 +52,22 @@ user_movie = np.load('datasets/user_movie.npy')
 # In[4]:
 
 
-get_ipython().run_cell_magic('time', '', 'c = user_movie[:,0]\nr = user_movie[:,1]\nd = np.ones(len(c))\nmax_c = len(np.unique(c))\nmax_r = len(np.unique(r))\n# m = csr_matrix((d, (r,c)), shape=(max_r, max_c))\ncsc = csc_matrix((d, (r,c)), shape=(max_r, max_c))\ncsr = csr_matrix((d, (r,c)), shape=(max_r, max_c))\nsignature_length = 50\n\n# example = np.array([[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,0,1,0],[0,0,1,0]])\n# hash_func = np.array([[4,3,1,2,0], [3,0,4,2,1]])')
+# %%time
+c = user_movie[:,0]
+r = user_movie[:,1]
+d = np.ones(len(c))
+max_c = len(np.unique(c))
+max_r = len(np.unique(r))
+# m = csr_matrix((d, (r,c)), shape=(max_r, max_c))
+csc = csc_matrix((d, (r,c)), shape=(max_r, max_c))
+csr = csr_matrix((d, (r,c)), shape=(max_r, max_c))
+signature_length = 50
+
+# example = np.array([[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,0,1,0],[0,0,1,0]])
+# hash_func = np.array([[4,3,1,2,0], [3,0,4,2,1]])
 
 
-# In[47]:
+# In[61]:
 
 
 def rowminhash(signature_length, hashfunc, matrix):
@@ -91,46 +103,85 @@ def rowminhash(signature_length, hashfunc, matrix):
 # In[19]:
 
 
-def minhash(signature_length,hashfunc, matrix):
-    # t0 = time.time()
-    sigm = np.full((signature_length, matrix.shape[1]), np.inf)
-    # print(sigm)
-    # hash_func = np.array([np.random.permutation(matrix.shape[0]) for i in range(signature_length)])
-    # print(hash_func)
-    for r,c in zip(*matrix.nonzero()):
-        # print('r = ', r, 'c = ', c)
-        for h_i in range(signature_length):
-            # print('h_i = ' ,h_i)
-            hash = hash_func[h_i]
-            if(hash[r] < sigm[h_i][c]):
-                # print(hash[r])
-                sigm[h_i][c] = hash[r]
-            # print("\nGenerating MinHash signatures took %.2fsec" % elapsed)
-        # elapsed = (time.time() - t0)            
-    return(sigm)  
+# def minhash(signature_length,hashfunc, matrix):
+#     # t0 = time.time()
+#     sigm = np.full((signature_length, matrix.shape[1]), np.inf)
+#     # print(sigm)
+#     # hash_func = np.array([np.random.permutation(matrix.shape[0]) for i in range(signature_length)])
+#     # print(hash_func)
+#     for r,c in zip(*matrix.nonzero()):
+#         # print('r = ', r, 'c = ', c)
+#         for h_i in range(signature_length):
+#             # print('h_i = ' ,h_i)
+#             hash = hash_func[h_i]
+#             if(hash[r] < sigm[h_i][c]):
+#                 # print(hash[r])
+#                 sigm[h_i][c] = hash[r]
+#             # print("\nGenerating MinHash signatures took %.2fsec" % elapsed)
+#         # elapsed = (time.time() - t0)            
+#     return(sigm)  
+
+
+# In[59]:
+
+
+# from collections import defaultdict
+# threshold=0.5
+# numhashes = signature_length
+# b, _ = choose_nbands(threshold, numhashes)
+# r = int(numhashes / b)
+# print(b, r)
+# 
+# n_col = len(csc.shape[1])
+# for band in range(b):
+#     # figure out which rows of minhash signature matrix to hash for this band
+#     start_index = int(band * r)
+#     end_index = min(start_index + r, numhashes)
+# 
+#     # initialize hashtable for this band
+#     cur_buckets = defaultdict(list)
+#     
+#     for j in range(n_col):
+#       # THIS IS WHAT YOU NEED TO IMPLEMENT
+# # http://www.hcbravo.org/dscert-mldm/projects/project_1/
+# #     https://colab.research.google.com/drive/1HetBrWFRYqwUxn0v7wIwS7COBaNmusfD#scrollTo=hzPw8EMoW4i4&forceEdit=true&sandboxMode=true
+#     # add this hashtable to the list of hashtables
+#     buckets.append(cur_buckets)
+
+
+# In[57]:
+
+
+# import scipy.optimize as opt
+# import math
+# 
+# def choose_nbands(t, n):
+#     def error_fun(x):
+#         cur_t = (1/x[0])**(x[0]/n)
+#         return (t-cur_t)**2
+# 
+#     opt_res = opt.minimize(error_fun, x0=(10), method='Nelder-Mead')
+#     b = int(math.ceil(opt_res['x'][0]))
+#     r = int(n / b)
+#     final_t = (1/b)**(1/r)
+#     return b, final_t
+# 
+# 
+# 
+# 
+# def do_lsh(sign_matrix, signature_length, threshold):
+#     return 0
 
 
 # In[ ]:
-
-
-def do_lsh(sign_matrix, signature_length, threshold):
-    return 0
-
-
-# In[48]:
 
 
 np.random.seed = 42
 
 # example = csr
 # example = np.array([[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,0,1,0],[0,0,1,0]])
-hash_func = np.array([np.random.permutation(csr.shape[0]) for i in range(signature_length)])
 # %time sigm1 = minhash(signature_length,hash_func, example)
-get_ipython().run_line_magic('time', 'sigm1 = rowminhash(100 ,hash_func, csr)')
-get_ipython().run_line_magic('time', 'sigm2 = rowminhash(signature_length,hash_func, csr)')
 # print(sigm2)
-np.save('datasets/sign_matrix_100', sigm1)
-np.save('datasets/sign_matrix', sigm2)
 
 # print(np.equal(sigm1, sigm2))
 
@@ -138,13 +189,13 @@ np.save('datasets/sign_matrix', sigm2)
 # In[ ]:
 
 
-print(hash_func)
+# print(hash_func)
 # csr1 = example
-for row in range(csr1.shape[1]):
-    ones = find(csr1[row,:])[1]
+# for row in range(csr1.shape[1]):
+#     ones = find(csr1[row,:])[1]
     # print(ones)
-    hash = hash_func[:, ones]
-    print(hash)
+    # hash = hash_func[:, ones]
+    # print(hash)
     # np.amin()
     
     # row_signature = np.amin(hash,).reshape((1,signature_length))
@@ -171,6 +222,12 @@ def main(argv):
     seed = sys.argv[1]
     path = sys.argv[2]
     print(seed, path)
+    
+    hash_func = np.array([np.random.permutation(csr.shape[0]) for i in range(signature_length)])
+    sigm1 = rowminhash(100 ,hash_func, csr)
+    sigm2 = rowminhash(signature_length,hash_func, csr)
+    np.save('datasets/sign_matrix_100', sigm1)
+    np.save('datasets/sign_matrix', sigm2)
 
 
 # The following snippet passes the start of the program and the command line arguments to the `main` function.
