@@ -152,7 +152,7 @@ def write_pair_to_file(pair,path='ans.txt'):
 class LSH():
     
     def __init__(self, dataset=None, sparse_matrix=None, 
-                 signature_length=50, permutations=None, signature_matrix=None, buckets=None, random_seed=10102020, threshold=0.5):
+                 signature_length=100, permutations=None, signature_matrix=None, buckets=None, random_seed=10102020, threshold=0.5):
         self.dataset = dataset
         self.signature_length = signature_length
         self.sparse_matrix = sparse_matrix
@@ -250,7 +250,7 @@ class LSH():
 # The `main` function handles the command line arguments and is responsible for the main flow of the program.
 # 
 # In order to do this the function uses the following parameter:
-#   * `path` - the location fo the `user_movies.npy` file [default = 'datasets/user_movie.npy']
+#   * `path` - the location for the `user_movies.npy` file [default = 'datasets/user_movie.npy']
 #   * `threshold` - the targeted threshold value
 
 # In[6]:
@@ -269,24 +269,49 @@ def main(path = 'datasets/user_movie.npy', threshold = 0.5):
 #     r = round(lsh.signature_length / b)
     r = 10
     b = round(lsh.signature_length / r)
-    
     lsh.split_to_buckets(b,r)
     lsh.get_pairs_from_buckets()
+    print(f'Results => {lsh.signature_matrix.shape}, {lsh.signature_length}')
 
 
 # The following snippet passes the start of the program and the command line arguments to the `main` function.
 # 
 # The following command line argument is expected:
 #   * `path` - the location of the `user_movies.npy` file
+# 
 
 # In[7]:
 
 
 if __name__ == "__main__":
     filepath = sys.argv[1]
+    start_time = time.time()
     main(path=filepath)
+    print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # ### **Discussion**
 # 
-# An important point of discussion with regards to our implementation of LSH concerns the number of bands to use and the size of each band. In the assignment notes it is required that the similarity threshold is 0.5. Based on this requirement the `compute_num_bands` function the number of bands (and their size) can be computed to be as close to the threshold as possible. However, when running the algorithm this results in a significant amount of candidate pairs (100's of thousands). Many of these pairs also have an estimated jaccard similarity (based on their signatures) of less than 0.5. In other words, there are far too many false positives. Thus, we played with various settings for the number of bands and rows. Eventually, and on the advice of the teaching assistants, we settled with a band size of 10 rows. This brings the number of candidate pairs to a significantly smaller scope and much closer to the given amount of candidate pairs (namely +/-1200). However, using the formula for estimated similarity threshold we do observe that a band size of 10 rows and our default signature size of 50 results in an similarity threshold of approximately 0.85 during the execution of the `split_to_buckets` function. Obviosuly, during the verification of the candidate pairs only those pairs will be selected which actually have a similarity threshold of at least 0.5 (per the assignment requirements). However, the higher threshold during the `split_to_buckets` function means that the chance is much higher that there will be false negatives: i.e. pairs with a similarity of at least 0.5 which are not part of the candidate pairs. Increasing the signature size (and hence the number of bands) will decrease the estimated similarity threshold during the execution of `split_to_buckets`, but the problem of false negatives will still remain. Nevertheless, we have kept the suggested band size of 10 rows as the possibility of a false negative is less detrimental to finding as many pairs as possible in 15 minutes as a guarantee of a large set of false positives. Furthermore, it gives us more time to compare and verify candidate pairs with regards to their estimated jaccard similarity. 
+# An important point of discussion with regards to our implementation of LSH concerns the number of bands to use and the 
+# size of each band. In the assignment notes it is required that the similarity threshold is 0.5. 
+# Based on this requirement the `compute_num_bands` function the number of bands (and their size) can be computed to be
+#  as close to the threshold as possible. However, when running the algorithm this results in a significant amount 
+#  of candidate pairs (100's of thousands). Many of these pairs also have an estimated jaccard similarity 
+#  (based on their signatures) of less than 0.5. In other words, there are far too many false positives. 
+#  Thus, we played with various settings for the number of bands and rows. Eventually, and on the advice of the 
+#  teaching assistants, we settled with a band size of 10 rows. This brings the number of candidate pairs to a 
+#  significantly smaller scope and much closer to the given amount of candidate pairs (namely +/-1200). 
+#  However, using the formula for estimated similarity threshold we do observe that a band size of 10 rows and 
+#  our default signature size of 50 results in an similarity threshold of approximately 0.85 during the execution 
+#  of the `split_to_buckets` function. Obviously, during the verification of the candidate pairs only those pairs will 
+#  be selected which actually have a similarity threshold of at least 0.5 (per the assignment requirements). 
+#  However, the higher threshold during the `split_to_buckets` function means that the chance is much higher that 
+#  there will be false negatives: i.e. pairs with a similarity of at least 0.5 which are not part of the candidate pairs. 
+#  Increasing the signature size (and hence the number of bands) will decrease the estimated similarity threshold 
+#  during the execution of `split_to_buckets`, but the problem of false negatives will still remain. 
+#  Nevertheless, we have kept the suggested band size of 10 rows as the possibility of a false negative is less 
+#  detrimental to finding as many pairs as possible in 15 minutes as a guarantee of a large set of false positives. 
+#  Furthermore, it gives us more time to compare and verify candidate pairs with regards to their 
+#  estimated jaccard similarity. 
+# 
+# 
